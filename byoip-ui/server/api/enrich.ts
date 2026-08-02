@@ -17,7 +17,7 @@ export default defineEventHandler(async (event) => {
   const controller = new AbortController()
   const timer = setTimeout(() => controller.abort(), 15000)
   try {
-    const res = await fetch('http://ip-api.com/batch?fields=query,as,country,countryCode,regionName,city', {
+    const res = await fetch('http://ip-api.com/batch?fields=query,as,country,countryCode,regionName,city&lang=zh-CN', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(ips.ips),

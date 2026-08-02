@@ -41,7 +41,7 @@ async function fetchNodes() {
           node.asOrg = e.asOrg
           node.country = e.country
           node.countryCode = e.countryCode
-          node.city = e.region
+          node.city = e.city
         }
       }
     } catch {}
@@ -262,7 +262,7 @@ onMounted(async () => {
                 </div>
                 <div>
                   <h3 class="text-base sm:text-lg font-semibold text-gray-900 font-mixed break-all">{{ node.ip }}</h3>
-                  <p v-if="node.country || node.city" class="text-xs text-gray-400">{{ node.country }}<template v-if="node.city"> / {{ node.city }}</template></p>
+                  <p v-if="node.country || node.city" class="text-xs text-gray-400">{{ node.country }}<template v-if="node.city"> · {{ node.city }}</template></p>
                   <p class="text-sm text-gray-500">端口: {{ node.port }}</p>
                 </div>
               </div>
