@@ -311,7 +311,7 @@ onMounted(async () => {
     </div>
 
     <!-- Footer -->
-    <footer class="bg-gray-50 text-gray-950 border-t border-gray-200 py-3 md:py-4 fixed bottom-0 left-0 right-0 z-10 bg-opacity-90 backdrop-blur-sm">
+    <footer class="bg-gray-50 text-gray-950 border-t border-gray-200 py-3 md:py-4 bg-opacity-90 backdrop-blur-sm" style="position:fixed;bottom:0;left:0;right:0;z-index:10">
       <div class="container mx-auto px-4 sm:px-6 lg:px-8">
         <div class="flex flex-col items-center justify-between gap-4 md:flex-row">
           <span class="text-sm md:text-base">Copyright &copy; 2026 小钱优选服务</span>
