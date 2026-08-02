@@ -20,38 +20,25 @@ const checking = ref(false)
 const toast = ref('')
 const showLoading = ref(true)
 const lastCheckTime = ref<number | null>(null)
+const isDark = ref(false)
 let toastTimer: ReturnType<typeof setTimeout>
 let refreshTimer: ReturnType<typeof setTimeout>
 
-async function fetchNodes() {
-  try {
-    const controller = new AbortController()
-    const timer = setTimeout(() => controller.abort(), 15000)
-    const data = await $fetch<{ ip: string; port: string; region: string; speed: number; full: string }[]>('/api/nodes', { signal: controller.signal })
-    clearTimeout(timer)
-    nodes.value = data.map(n => ({ ...n, status: 'unknown' as const, latency: 0, asn: '', asOrg: '', country: '', countryCode: '', city: '' }))
-    try {
-      const enrich = await $fetch<{ ip: string; as: string; asOrg: string; country: string; countryCode: string; region: string; city: string }[]>('/api/enrich', { method: 'POST', body: { ips: nodes.value.map(n => n.ip) } })
-      const map = new Map(enrich.map(e => [e.ip, e]))
-      for (const node of nodes.value) {
-        const e = map.get(node.ip)
-        if (e) {
-          node.asn = e.as
-          node.asOrg = e.asOrg
-          node.country = e.country
-          node.countryCode = e.countryCode
-          node.city = e.city
-        }
-      }
-    } catch {}
-  } catch {
-    nodes.value = []
-  }
+function toggleDark() {
+  isDark.value = !isDark.value
+  document.documentElement.classList.toggle('dark', isDark.value)
+  localStorage.setItem('dark-mode', isDark.value ? '1' : '0')
 }
 
-const maxSpeed = computed(() => {
-  if (nodes.value.length === 0) return 0
-  return Math.max(...nodes.value.map(n => n.speed))
+onMounted(async () => {
+  if (localStorage.getItem('dark-mode') === '1') {
+    isDark.value = true
+    document.documentElement.classList.add('dark')
+  }
+  await fetchNodes()
+  showLoading.value = false
+  checkAll()
+  refreshTimer = setInterval(() => { checkAll() }, 300000)
 })
 
 const filteredNodes = computed(() => {
@@ -66,6 +53,7 @@ const filteredNodes = computed(() => {
 
 const aliveCount = computed(() => nodes.value.filter(n => n.status === 'alive').length)
 const deadCount = computed(() => nodes.value.filter(n => n.status === 'dead').length)
+const maxSpeed = computed(() => Math.max(...nodes.value.map(n => n.speed), 0))
 
 function showToast(msg: string) {
   toast.value = msg
@@ -160,29 +148,26 @@ function getBadgeColor(region: string) {
   }
   return badgeColors[Math.abs(hash) % badgeColors.length]
 }
-
-onMounted(async () => {
-  await fetchNodes()
-  showLoading.value = false
-  checkAll()
-  refreshTimer = setInterval(() => { checkAll() }, 300000)
-})
 </script>
 
 <template>
-  <div class="min-h-screen bg-white text-gray-900 pb-32">
+  <div class="min-h-screen bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 pb-32">
     <!-- Navigation -->
     <div class="font-mixed font-bold">
-      <nav class="bg-white border-b border-gray-200 py-2.5 md:py-3 px-3 fixed top-0 left-0 right-0 z-10">
+      <nav class="bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 py-2.5 md:py-3 px-3 fixed top-0 left-0 right-0 z-10">
         <div class="max-w-[1200px] mx-auto flex items-center justify-between px-2 sm:px-4 md:px-4">
-          <a href="/" class="font-bold text-gray-800 no-underline text-base md:text-lg hover:text-blue-500 flex items-center min-w-0 gap-1">
+          <a href="/" class="font-bold text-gray-800 dark:text-gray-100 no-underline text-base md:text-lg hover:text-blue-500 flex items-center min-w-0 gap-1">
             <svg class="w-6 h-6 text-blue-500" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-1 17.93c-3.95-.49-7-3.85-7-7.93 0-.62.08-1.21.21-1.79L9 15v1c0 1.1.9 2 2 2v1.93zm6.9-2.54c-.26-.81-1-1.39-1.9-1.39h-1v-3c0-.55-.45-1-1-1H8v-2h2c.55 0 1-.45 1-1V7h2c1.1 0 2-.9 2-2v-.41c2.93 1.19 5 4.06 5 7.41 0 2.08-.8 3.97-2.1 5.39z"/></svg>
             <span class="truncate">小钱优选服务</span>
           </a>
           <div class="hidden md:flex flex-1 items-center justify-center gap-1">
-            <a href="/" class="text-blue-600 no-underline !py-1.5 !px-3 rounded-md font-medium bg-blue-50">首页</a>
+            <a href="/" class="text-blue-600 dark:text-blue-400 no-underline !py-1.5 !px-3 rounded-md font-medium bg-blue-50 dark:bg-blue-900/50">首页</a>
           </div>
           <div class="flex items-center gap-2">
+            <button @click="toggleDark" class="p-2 rounded-md text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors" :title="isDark ? '切换亮色模式' : '切换暗色模式'">
+              <svg v-if="isDark" class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z"/></svg>
+              <svg v-else class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z"/></svg>
+            </button>
           </div>
         </div>
       </nav>
@@ -190,24 +175,24 @@ onMounted(async () => {
     </div>
 
     <!-- Loading Spinner -->
-    <div v-if="showLoading" class="fixed inset-0 z-[9999] w-screen h-screen flex items-center justify-center bg-white/95 backdrop-blur-sm">
+    <div v-if="showLoading" class="fixed inset-0 z-[9999] w-screen h-screen flex items-center justify-center bg-white/95 dark:bg-gray-900/95 backdrop-blur-sm">
       <div class="flex flex-col items-center gap-3">
-        <svg class="animate-spin h-8 w-8 text-gray-900" viewBox="0 0 24 24">
+        <svg class="animate-spin h-8 w-8 text-gray-900 dark:text-gray-100" viewBox="0 0 24 24">
           <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4" fill="none"/>
           <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z"/>
         </svg>
-        <span class="text-sm text-gray-800">加载中…</span>
+        <span class="text-sm text-gray-800 dark:text-gray-200">加载中…</span>
       </div>
     </div>
 
     <!-- Main Content -->
     <div class="container mx-auto px-4 py-8">
       <div class="text-center mb-12">
-        <h1 class="text-4xl md:text-5xl font-bold text-gray-900 mb-4 font-chinese">小钱优选服务</h1>
-        <p class="text-xl text-gray-600 max-w-3xl mx-auto font-chinese">Cloudflare优选 IP 状态监测服务</p>
+        <h1 class="text-4xl md:text-5xl font-bold text-gray-900 dark:text-gray-100 mb-4 font-chinese">小钱优选服务</h1>
+        <p class="text-xl text-gray-600 dark:text-gray-400 max-w-3xl mx-auto font-chinese">Cloudflare优选 IP 状态监测服务</p>
         <div class="mt-8 mx-auto max-w-2xl">
-          <div class="bg-gradient-to-r from-green-50 to-blue-50 border border-green-200 rounded-lg p-4 shadow-sm">
-            <div class="flex items-center justify-center space-x-2 text-green-700">
+          <div class="bg-gradient-to-r from-green-50 dark:from-green-900/30 to-blue-50 dark:to-blue-900/30 border border-green-200 dark:border-green-800 rounded-lg p-4 shadow-sm">
+            <div class="flex items-center justify-center space-x-2 text-green-700 dark:text-green-400">
               <svg class="w-5 h-5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/>
               </svg>
@@ -219,25 +204,25 @@ onMounted(async () => {
 
       <!-- Stats -->
       <div class="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
-        <div class="bg-green-50 rounded-lg p-6 text-center">
-          <div class="text-2xl font-bold text-green-600 font-mixed">{{ nodes.length }}</div>
-          <div class="text-sm text-green-700">优选 IP 总数</div>
+        <div class="bg-green-50 dark:bg-green-900/30 rounded-lg p-6 text-center">
+          <div class="text-2xl font-bold text-green-600 dark:text-green-400 font-mixed">{{ nodes.length }}</div>
+          <div class="text-sm text-green-700 dark:text-green-400">优选 IP 总数</div>
         </div>
-        <div class="bg-blue-50 rounded-lg p-6 text-center">
-          <div class="text-2xl font-bold text-blue-600 font-mixed">{{ maxSpeed.toFixed(0) }}</div>
-          <div class="text-sm text-blue-700">最高带宽 Mbps</div>
+        <div class="bg-blue-50 dark:bg-blue-900/30 rounded-lg p-6 text-center">
+          <div class="text-2xl font-bold text-blue-600 dark:text-blue-400 font-mixed">{{ maxSpeed.toFixed(0) }}</div>
+          <div class="text-sm text-blue-700 dark:text-blue-400">最高带宽 Mbps</div>
         </div>
         
-        <div class="bg-yellow-50 rounded-lg p-6 text-center">
-          <div class="text-2xl font-bold text-yellow-600 font-mixed">{{ checking ? '检测中...' : '已检测' }}</div>
-          <div class="text-sm text-yellow-700">IP存活检测</div>
+        <div class="bg-yellow-50 dark:bg-yellow-900/30 rounded-lg p-6 text-center">
+          <div class="text-2xl font-bold text-yellow-600 dark:text-yellow-400 font-mixed">{{ checking ? '检测中...' : '已检测' }}</div>
+          <div class="text-sm text-yellow-700 dark:text-yellow-400">IP存活检测</div>
         </div>
       </div>
 
       <!-- Status + Search -->
       <div class="flex flex-col sm:flex-row items-center justify-between mb-6 gap-4">
-        <div class="flex items-center gap-2 px-4 py-2 bg-gray-50 rounded-lg">
-          <div class="w-2 h-2 rounded-full" :class="aliveCount > 0 ? 'bg-green-500' : 'bg-gray-300'"></div>
+        <div class="flex items-center gap-2 px-4 py-2 bg-gray-50 dark:bg-gray-800 rounded-lg">
+          <div class="w-2 h-2 rounded-full" :class="aliveCount > 0 ? 'bg-green-500' : 'bg-gray-300 dark:bg-gray-600'"></div>
           <span class="text-sm font-medium" :class="statusColor">{{ statusText }}</span>
         </div>
         <div class="w-full sm:w-72">
@@ -245,7 +230,7 @@ onMounted(async () => {
             v-model="search"
             type="text"
             placeholder="筛选 IP / 地区 / ASN..."
-            class="w-full px-4 py-2 border border-gray-200 rounded-lg text-sm text-gray-700 focus:outline-none focus:ring-2 focus:ring-blue-100 focus:border-blue-300"
+            class="w-full px-4 py-2 border border-gray-200 dark:border-gray-600 rounded-lg text-sm text-gray-700 dark:text-gray-200 bg-white dark:bg-gray-800 focus:outline-none focus:ring-2 focus:ring-blue-100 dark:focus:ring-blue-800 focus:border-blue-300"
           />
         </div>
       </div>
@@ -253,7 +238,7 @@ onMounted(async () => {
       <!-- Card Grid -->
       <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
         <div v-for="node in filteredNodes" :key="node.full">
-          <div class="bg-white rounded-lg shadow-md hover:shadow-lg transition-shadow duration-300 p-4 sm:p-6 border border-gray-200">
+          <div class="bg-white dark:bg-gray-800 rounded-lg shadow-md hover:shadow-lg transition-shadow duration-300 p-4 sm:p-6 border border-gray-200 dark:border-gray-700">
             <!-- Card Header -->
             <div class="flex items-start sm:items-center justify-between mb-4 gap-3">
               <div class="flex items-center space-x-3">
@@ -263,15 +248,15 @@ onMounted(async () => {
                   </div>
                 </div>
                 <div>
-                  <h3 class="text-base sm:text-lg font-semibold text-gray-900 font-mixed break-all">{{ node.ip }}</h3>
-                  <p class="text-sm text-gray-500">
+                  <h3 class="text-base sm:text-lg font-semibold text-gray-900 dark:text-gray-100 font-mixed break-all">{{ node.ip }}</h3>
+                  <p class="text-sm text-gray-500 dark:text-gray-400">
                     <template v-if="node.country || node.city">{{ node.country }}<template v-if="node.city"> · {{ node.city }}</template></template>
                   </p>
                 </div>
               </div>
               <div class="flex items-center space-x-1">
-                <div class="w-2 h-2 rounded-full" :class="node.status === 'alive' ? 'bg-green-500' : node.status === 'dead' ? 'bg-red-500' : node.status === 'checking' ? 'bg-yellow-500 animate-pulse' : 'bg-gray-300'"></div>
-                <span class="text-xs font-medium" :class="node.status === 'alive' ? 'text-green-700' : node.status === 'dead' ? 'text-red-600' : node.status === 'checking' ? 'text-yellow-600' : 'text-gray-400'">
+                <div class="w-2 h-2 rounded-full" :class="node.status === 'alive' ? 'bg-green-500' : node.status === 'dead' ? 'bg-red-500' : node.status === 'checking' ? 'bg-yellow-500 animate-pulse' : 'bg-gray-300 dark:bg-gray-600'"></div>
+                <span class="text-xs font-medium" :class="node.status === 'alive' ? 'text-green-700 dark:text-green-400' : node.status === 'dead' ? 'text-red-600 dark:text-red-400' : node.status === 'checking' ? 'text-yellow-600 dark:text-yellow-400' : 'text-gray-400 dark:text-gray-500'">
                   {{ node.status === 'alive' ? '在线' : node.status === 'dead' ? '离线' : node.status === 'checking' ? '检测' : '未知' }}
                 </span>
               </div>
@@ -279,15 +264,15 @@ onMounted(async () => {
 
             <!-- IP Address Box -->
             <div class="mb-4">
-              <h4 class="text-sm font-medium text-gray-700 mb-2">优选 IP 地址:</h4>
+              <h4 class="text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">优选 IP 地址:</h4>
               <div class="relative group">
-                <div class="flex items-center justify-between bg-white border border-gray-200 shadow-sm rounded-lg px-3 py-2.5 transition-all duration-200 hover:shadow-md hover:border-blue-200">
+                <div class="flex items-center justify-between bg-white dark:bg-gray-700 border border-gray-200 dark:border-gray-600 shadow-sm rounded-lg px-3 py-2.5 transition-all duration-200 hover:shadow-md hover:border-blue-200 dark:hover:border-blue-600">
                   <div class="flex-1 min-w-0 mr-3">
-                    <div class="text-sm font-mono text-gray-800 font-mixed whitespace-nowrap overflow-hidden" style="mask-image:linear-gradient(to right, black 85%, transparent 100%);-webkit-mask-image:linear-gradient(to right, black 85%, transparent 100%);">{{ node.ip }}<span class="text-gray-400">:{{ node.port }}</span></div>
+                    <div class="text-sm font-mono text-gray-800 dark:text-gray-200 font-mixed whitespace-nowrap overflow-hidden" style="mask-image:linear-gradient(to right, black 85%, transparent 100%);-webkit-mask-image:linear-gradient(to right, black 85%, transparent 100%);">{{ node.ip }}<span class="text-gray-400 dark:text-gray-500">:{{ node.port }}</span></div>
                   </div>
                   <div class="flex items-center space-x-2 flex-shrink-0">
                     <button
-                      class="flex items-center px-2 py-2 text-xs font-medium rounded text-blue-600 bg-blue-50 hover:bg-blue-100 hover:text-blue-700 transition-colors"
+                      class="flex items-center px-2 py-2 text-xs font-medium rounded text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-900/50 hover:bg-blue-100 dark:hover:bg-blue-900/80 hover:text-blue-700 dark:hover:text-blue-300 transition-colors"
                       @click.stop="copyIp(node.full)"
                     >
                       <svg class="h-3.5 w-3.5 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -302,10 +287,10 @@ onMounted(async () => {
 
             <!-- Tags -->
             <div class="flex flex-wrap gap-2">
-              <span v-if="node.asn" class="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-gray-100 text-gray-700">{{ node.asn }}</span>
-              <span v-if="node.asOrg" class="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-gray-100 text-gray-700 max-w-[200px] truncate" :title="node.asOrg">{{ node.asOrg }}</span>
-              <span class="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-green-100 text-green-800">{{ node.speed.toFixed(0) }} Mbps</span>
-              <span v-if="node.status === 'alive' && node.latency > 0" class="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-purple-100 text-purple-800">{{ node.latency }} ms</span>
+              <span v-if="node.asn" class="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300">{{ node.asn }}</span>
+              <span v-if="node.asOrg" class="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 max-w-[200px] truncate" :title="node.asOrg">{{ node.asOrg }}</span>
+              <span class="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-green-100 dark:bg-green-900/50 text-green-800 dark:text-green-300">{{ node.speed.toFixed(0) }} Mbps</span>
+              <span v-if="node.status === 'alive' && node.latency > 0" class="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-purple-100 dark:bg-purple-900/50 text-purple-800 dark:text-purple-300">{{ node.latency }} ms</span>
             </div>
           </div>
         </div>
@@ -313,14 +298,14 @@ onMounted(async () => {
     </div>
 
     <!-- Footer -->
-    <footer class="bg-gray-50 text-gray-950 border-t border-gray-200 py-3 md:py-4 bg-opacity-90 backdrop-blur-sm" style="position:fixed;bottom:0;left:0;right:0;z-index:10">
+    <footer class="bg-gray-50 dark:bg-gray-800 text-gray-950 dark:text-gray-100 border-t border-gray-200 dark:border-gray-700 py-3 md:py-4 bg-opacity-90 backdrop-blur-sm" style="position:fixed;bottom:0;left:0;right:0;z-index:10">
       <div class="container mx-auto px-4 sm:px-6 lg:px-8">
         <div class="flex flex-col items-center justify-between gap-4 md:flex-row">
           <span class="text-sm md:text-base">Copyright &copy; 2026 小钱优选服务</span>
           <nav>
             <span class="flex items-center gap-2 leading-tight">
               Powered By
-              <a href="https://nuxt.com" class="text-blue-600">
+              <a href="https://nuxt.com" class="text-blue-600 dark:text-blue-400">
                 <svg width="80" height="20" viewBox="0 0 800 200" fill="none" xmlns="http://www.w3.org/2000/svg">
                   <path d="M377 200C379.16 200 381 198.209 381 196V103C381 103 386 112 395 127L434 194C435.785 197.74 439.744 200 443 200H470V50H443C441.202 50 439 51.4941 439 54V148L421 116L385 55C383.248 51.8912 379.479 50 376 50H350V200H377Z" fill="currentColor"/>
                   <path d="M726 92H739C742.314 92 745 89.3137 745 86V60H773V92H800V116H773V159C773 169.5 778.057 174 787 174H800V200H783C759.948 200 745 185.071 745 160V116H726V92Z" fill="currentColor"/>
@@ -338,7 +323,7 @@ onMounted(async () => {
     <!-- Toast -->
     <Teleport to="body">
       <div v-if="toast" class="fixed top-4 left-1/2 -translate-x-1/2 z-50">
-        <div class="px-4 py-2 bg-white border border-green-200 rounded-lg shadow-lg text-green-700 text-sm font-medium">
+        <div class="px-4 py-2 bg-white dark:bg-gray-800 border border-green-200 dark:border-green-800 rounded-lg shadow-lg text-green-700 dark:text-green-400 text-sm font-medium">
           {{ toast }}
         </div>
       </div>
