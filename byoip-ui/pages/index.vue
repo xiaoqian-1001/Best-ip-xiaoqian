@@ -30,6 +30,31 @@ function toggleDark() {
   localStorage.setItem('dark-mode', isDark.value ? '1' : '0')
 }
 
+async function fetchNodes() {
+  try {
+    const raw = await $fetch<string>('/api/nodes')
+    const lines = raw.split('\n').filter(l => l.trim())
+    const parsed: NodeItem[] = lines.map(l => {
+      const [addr, rest] = l.split('#')
+      const [ip, port] = addr.split(':')
+      const [region, speedStr] = rest.split(' ')
+      return { ip, port, region, speed: parseFloat(speedStr) || 0, full: `${ip}:${port}`, status: 'unknown', latency: 0, asn: '', asOrg: '', country: '', countryCode: '', city: '' }
+    })
+    const ips = parsed.map(n => n.ip)
+    try {
+      const geo = await $fetch<Record<string, { asn: string; asOrg: string; country: string; countryCode: string; city: string }>>('/api/enrich', { params: { ips: ips.join(',') } })
+      parsed.forEach(n => {
+        if (geo[n.ip]) {
+          n.asn = geo[n.ip].asn; n.asOrg = geo[n.ip].asOrg; n.country = geo[n.ip].country; n.countryCode = geo[n.ip].countryCode; n.city = geo[n.ip].city
+        }
+      })
+    } catch { /* geo optional */ }
+    nodes.value = parsed
+  } catch (e) {
+    console.error('fetchNodes error:', e)
+  }
+}
+
 onMounted(async () => {
   if (localStorage.getItem('dark-mode') === '1') {
     isDark.value = true
