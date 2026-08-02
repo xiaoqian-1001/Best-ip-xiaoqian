@@ -21,7 +21,10 @@ let refreshTimer: ReturnType<typeof setTimeout>
 
 async function fetchNodes() {
   try {
-    const data = await $fetch<{ ip: string; port: string; region: string; speed: number; full: string }[]>('/api/nodes')
+    const controller = new AbortController()
+    const timer = setTimeout(() => controller.abort(), 15000)
+    const data = await $fetch<{ ip: string; port: string; region: string; speed: number; full: string }[]>('/api/nodes', { signal: controller.signal })
+    clearTimeout(timer)
     nodes.value = data.map(n => ({ ...n, status: 'unknown' as const, latency: 0 }))
   } catch {
     nodes.value = []
