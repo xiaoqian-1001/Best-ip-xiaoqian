@@ -145,12 +145,20 @@ const timeAgo = computed(() => {
   return `${Math.floor(seconds / 60)} 分钟前检测`
 })
 
+const badgeColors = [
+  'bg-red-500', 'bg-blue-600', 'bg-green-600', 'bg-purple-600',
+  'bg-pink-500', 'bg-indigo-600', 'bg-teal-500', 'bg-orange-500',
+  'bg-cyan-600', 'bg-rose-500', 'bg-violet-600', 'bg-lime-500',
+  'bg-amber-500', 'bg-emerald-600', 'bg-fuchsia-600', 'bg-sky-500',
+  'bg-yellow-600', 'bg-stone-600'
+]
+
 function getBadgeColor(region: string) {
-  const colors: Record<string, string> = {
-    JP: 'bg-orange-500',
-    HK: 'bg-blue-600'
+  let hash = 0
+  for (let i = 0; i < region.length; i++) {
+    hash = region.charCodeAt(i) + ((hash << 5) - hash)
   }
-  return colors[region] || 'bg-gray-500'
+  return badgeColors[Math.abs(hash) % badgeColors.length]
 }
 
 onMounted(async () => {
