@@ -242,7 +242,7 @@ onMounted(async () => {
           <input
             v-model="search"
             type="text"
-            placeholder="筛选 IP / 地区..."
+            placeholder="筛选 IP / 地区 / ASN..."
             class="w-full px-4 py-2 border border-gray-200 rounded-lg text-sm text-gray-700 focus:outline-none focus:ring-2 focus:ring-blue-100 focus:border-blue-300"
           />
         </div>
