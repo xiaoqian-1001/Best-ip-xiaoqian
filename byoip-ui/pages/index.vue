@@ -263,8 +263,7 @@ onMounted(async () => {
                 <div>
                   <h3 class="text-base sm:text-lg font-semibold text-gray-900 font-mixed break-all">{{ node.ip }}</h3>
                   <p class="text-sm text-gray-500">
-                    <template v-if="node.country || node.city">{{ node.country }}<template v-if="node.city"> · {{ node.city }}</template> · </template>
-                    端口: {{ node.port }}
+                    <template v-if="node.country || node.city">{{ node.country }}<template v-if="node.city"> · {{ node.city }}</template></template>
                   </p>
                 </div>
               </div>
