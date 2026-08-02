@@ -1,7 +1,6 @@
 import { defineEventHandler, getQuery } from 'h3'
-import * as net from 'net'
 
-export default defineEventHandler((event) => {
+export default defineEventHandler(async (event) => {
   const query = getQuery(event)
   const ip = query.ip as string
   const port = parseInt(query.port as string, 10)
@@ -9,6 +8,8 @@ export default defineEventHandler((event) => {
   if (!ip || !port) {
     return { alive: false, latency: 0 }
   }
+
+  const net = await import('node:net').then(m => m.default || m)
 
   return new Promise((resolve) => {
     const socket = new net.Socket()
