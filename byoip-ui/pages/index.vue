@@ -32,20 +32,15 @@ function toggleDark() {
 
 async function fetchNodes() {
   try {
-    const raw = await $fetch<string>('/api/nodes')
-    const lines = raw.split('\n').filter(l => l.trim())
-    const parsed: NodeItem[] = lines.map(l => {
-      const [addr, rest] = l.split('#')
-      const [ip, port] = addr.split(':')
-      const [region, speedStr] = rest.split(' ')
-      return { ip, port, region, speed: parseFloat(speedStr) || 0, full: `${ip}:${port}`, status: 'unknown', latency: 0, asn: '', asOrg: '', country: '', countryCode: '', city: '' }
-    })
+    const data = await $fetch<{ ip: string; port: string; region: string; speed: number; full: string }[]>('/api/nodes')
+    const parsed: NodeItem[] = data.map(n => ({ ...n, status: 'unknown', latency: 0, asn: '', asOrg: '', country: '', countryCode: '', city: '' }))
     const ips = parsed.map(n => n.ip)
     try {
-      const geo = await $fetch<Record<string, { asn: string; asOrg: string; country: string; countryCode: string; city: string }>>('/api/enrich', { params: { ips: ips.join(',') } })
+      const geo = await $fetch('/api/enrich', { method: 'POST', body: { ips } })
+      const geoMap = (geo as any[]).reduce((acc: Record<string, any>, item: any) => { acc[item.ip] = item; return acc }, {})
       parsed.forEach(n => {
-        if (geo[n.ip]) {
-          n.asn = geo[n.ip].asn; n.asOrg = geo[n.ip].asOrg; n.country = geo[n.ip].country; n.countryCode = geo[n.ip].countryCode; n.city = geo[n.ip].city
+        if (geoMap[n.ip]) {
+          n.asn = geoMap[n.ip].as || ''; n.asOrg = geoMap[n.ip].asOrg || ''; n.country = geoMap[n.ip].country || ''; n.countryCode = geoMap[n.ip].countryCode || ''; n.city = geoMap[n.ip].city || ''
         }
       })
     } catch { /* geo optional */ }
