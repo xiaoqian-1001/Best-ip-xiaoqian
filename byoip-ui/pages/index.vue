@@ -60,7 +60,19 @@ async function copyIp(text: string) {
     await navigator.clipboard.writeText(text)
     showToast('已成功复制')
   } catch {
-    showToast('复制失败')
+    try {
+      const el = document.createElement('textarea')
+      el.value = text
+      el.style.position = 'fixed'
+      el.style.opacity = '0'
+      document.body.appendChild(el)
+      el.select()
+      document.execCommand('copy')
+      document.body.removeChild(el)
+      showToast('已成功复制')
+    } catch {
+      showToast('复制失败')
+    }
   }
 }
 
