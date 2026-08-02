@@ -300,14 +300,10 @@ onMounted(async () => {
 
             <!-- Tags -->
             <div class="flex flex-wrap gap-2">
-              <span class="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-blue-100 text-blue-800">{{ node.region }}</span>
-              <span class="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-green-100 text-green-800">{{ node.speed.toFixed(0) }} Mbps</span>
-              <span v-if="node.status === 'alive' && node.latency > 0" class="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-purple-100 text-purple-800">{{ node.latency }} ms</span>
               <span v-if="node.asn" class="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-gray-100 text-gray-700">{{ node.asn }}</span>
               <span v-if="node.asOrg" class="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-gray-100 text-gray-700 max-w-[200px] truncate" :title="node.asOrg">{{ node.asOrg }}</span>
-              <span class="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium" :class="node.status === 'alive' ? 'bg-green-100 text-green-800' : node.status === 'dead' ? 'bg-red-100 text-red-800' : 'bg-gray-100 text-gray-800'">
-                {{ node.status === 'alive' ? '在线' : node.status === 'dead' ? '离线' : node.status === 'checking' ? '检测中' : '未知' }}
-              </span>
+              <span class="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-green-100 text-green-800">{{ node.speed.toFixed(0) }} Mbps</span>
+              <span v-if="node.status === 'alive' && node.latency > 0" class="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-purple-100 text-purple-800">{{ node.latency }} ms</span>
             </div>
           </div>
         </div>
