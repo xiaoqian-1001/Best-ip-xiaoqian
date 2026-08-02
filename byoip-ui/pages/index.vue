@@ -226,7 +226,7 @@ onMounted(async () => {
         
         <div class="bg-yellow-50 rounded-lg p-6 text-center">
           <div class="text-2xl font-bold text-yellow-600 font-mixed">{{ checking ? '检测中...' : '已检测' }}</div>
-          <div class="text-sm text-yellow-700">节点存活检测</div>
+          <div class="text-sm text-yellow-700">IP存活检测</div>
           <div v-if="timeAgo" class="text-xs text-yellow-600 mt-1">{{ timeAgo }}</div>
         </div>
       </div>
