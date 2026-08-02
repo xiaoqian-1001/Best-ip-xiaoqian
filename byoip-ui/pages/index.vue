@@ -7,6 +7,11 @@ interface NodeItem {
   full: string
   status: 'unknown' | 'checking' | 'alive' | 'dead'
   latency: number
+  asn: string
+  asOrg: string
+  country: string
+  countryCode: string
+  city: string
 }
 
 const nodes = ref<NodeItem[]>([])
@@ -25,7 +30,21 @@ async function fetchNodes() {
     const timer = setTimeout(() => controller.abort(), 15000)
     const data = await $fetch<{ ip: string; port: string; region: string; speed: number; full: string }[]>('/api/nodes', { signal: controller.signal })
     clearTimeout(timer)
-    nodes.value = data.map(n => ({ ...n, status: 'unknown' as const, latency: 0 }))
+    nodes.value = data.map(n => ({ ...n, status: 'unknown' as const, latency: 0, asn: '', asOrg: '', country: '', countryCode: '', city: '' }))
+    try {
+      const enrich = await $fetch<{ ip: string; as: string; asOrg: string; country: string; countryCode: string; region: string; city: string }[]>('/api/enrich', { method: 'POST', body: { ips: nodes.value.map(n => n.ip) } })
+      const map = new Map(enrich.map(e => [e.ip, e]))
+      for (const node of nodes.value) {
+        const e = map.get(node.ip)
+        if (e) {
+          node.asn = e.as
+          node.asOrg = e.asOrg
+          node.country = e.country
+          node.countryCode = e.countryCode
+          node.city = e.region
+        }
+      }
+    } catch {}
   } catch {
     nodes.value = []
   }
@@ -40,7 +59,7 @@ const filteredNodes = computed(() => {
   const q = search.value.toLowerCase()
   let list = nodes.value
   if (q) {
-    list = list.filter(n => n.ip.includes(q) || n.region.toLowerCase().includes(q) || n.full.includes(q))
+    list = list.filter(n => n.ip.includes(q) || n.region.toLowerCase().includes(q) || n.full.includes(q) || n.country.toLowerCase().includes(q) || n.asn.toLowerCase().includes(q) || n.asOrg.toLowerCase().includes(q) || n.city.toLowerCase().includes(q))
   }
   const order: Record<string, number> = { alive: 0, unknown: 1, checking: 2, dead: 3 }
   return [...list].sort((a, b) => order[a.status] - order[b.status])
@@ -243,7 +262,10 @@ onMounted(async () => {
                 </div>
                 <div>
                   <h3 class="text-base sm:text-lg font-semibold text-gray-900 font-mixed break-all">{{ node.ip }}</h3>
-                  <p class="text-sm text-gray-500">端口: {{ node.port }}</p>
+                  <p class="text-sm text-gray-500">
+                    <template v-if="node.country || node.city">{{ node.country }}<template v-if="node.city"> / {{ node.city }}</template> · </template>
+                    端口: {{ node.port }}
+                  </p>
                 </div>
               </div>
               <div class="flex items-center space-x-1">
@@ -282,6 +304,8 @@ onMounted(async () => {
               <span class="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-blue-100 text-blue-800">{{ node.region }}</span>
               <span class="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-green-100 text-green-800">{{ node.speed.toFixed(0) }} Mbps</span>
               <span v-if="node.status === 'alive' && node.latency > 0" class="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-purple-100 text-purple-800">{{ node.latency }} ms</span>
+              <span v-if="node.asn" class="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-gray-100 text-gray-700">{{ node.asn }}</span>
+              <span v-if="node.asOrg" class="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-gray-100 text-gray-700 max-w-[200px] truncate" :title="node.asOrg">{{ node.asOrg }}</span>
               <span class="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium" :class="node.status === 'alive' ? 'bg-green-100 text-green-800' : node.status === 'dead' ? 'bg-red-100 text-red-800' : 'bg-gray-100 text-gray-800'">
                 {{ node.status === 'alive' ? '在线' : node.status === 'dead' ? '离线' : node.status === 'checking' ? '检测中' : '未知' }}
               </span>
