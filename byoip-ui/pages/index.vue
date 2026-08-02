@@ -281,7 +281,7 @@ onMounted(async () => {
               <div class="relative group">
                 <div class="flex items-center justify-between bg-white border border-gray-200 shadow-sm rounded-lg px-3 py-2.5 transition-all duration-200 hover:shadow-md hover:border-blue-200">
                   <div class="flex-1 min-w-0 mr-3">
-                    <div class="text-sm font-mono text-gray-800 font-mixed whitespace-nowrap overflow-hidden" style="mask-image:linear-gradient(to right, black 85%, transparent 100%);-webkit-mask-image:linear-gradient(to right, black 85%, transparent 100%);">{{ node.full }}</div>
+                    <div class="text-sm font-mono text-gray-800 font-mixed whitespace-nowrap overflow-hidden" style="mask-image:linear-gradient(to right, black 85%, transparent 100%);-webkit-mask-image:linear-gradient(to right, black 85%, transparent 100%);">{{ node.ip }}<span class="text-gray-400">:{{ node.port }}</span></div>
                   </div>
                   <div class="flex items-center space-x-2 flex-shrink-0">
                     <button
