@@ -19,7 +19,6 @@ const search = ref('')
 const checking = ref(false)
 const toast = ref('')
 const showLoading = ref(true)
-const showMobileMenu = ref(false)
 const lastCheckTime = ref<number | null>(null)
 let toastTimer: ReturnType<typeof setTimeout>
 let refreshTimer: ReturnType<typeof setTimeout>
@@ -176,9 +175,6 @@ onMounted(async () => {
             <a href="/" class="text-blue-600 no-underline !py-1.5 !px-3 rounded-md font-medium bg-blue-50">首页</a>
           </div>
           <div class="flex items-center gap-2">
-            <button class="md:hidden inline-flex items-center justify-center w-10 h-10 rounded-md border border-gray-200 text-gray-600 hover:bg-gray-50" @click="showMobileMenu = !showMobileMenu">
-              <svg class="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16"/></svg>
-            </button>
           </div>
         </div>
       </nav>
