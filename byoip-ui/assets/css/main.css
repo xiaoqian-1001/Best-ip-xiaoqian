@@ -1,0 +1,19 @@
+@import "https://cdn.jsdmirror.com/gh/FrecklyComb1728/blog@main/public/fonts/xiaolai.css";
+@import "https://cdn.jsdmirror.com/npm/@fontsource/cascadia-code@5.2.3/index.min.css";
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --font-chinese: "xiaolai", "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", sans-serif;
+    --font-english: "Cascadia Code", "SF Mono", "Monaco", "Inconsolata", "Roboto Mono", monospace;
+    --font-mixed: "Cascadia Code", "xiaolai", "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", monospace, sans-serif;
+  }
+
+  html, body {
+    font-family: var(--font-mixed);
+    font-size: 14px;
+  }
+}

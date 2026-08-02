@@ -1,0 +1,327 @@
+<script setup lang="ts">
+interface NodeItem {
+  ip: string
+  port: string
+  region: string
+  speed: number
+  full: string
+  status: 'unknown' | 'checking' | 'alive' | 'dead'
+  latency: number
+}
+
+const nodes = ref<NodeItem[]>([])
+const search = ref('')
+const checking = ref(false)
+const toast = ref('')
+const showLoading = ref(true)
+const showMobileMenu = ref(false)
+const lastCheckTime = ref<number | null>(null)
+let toastTimer: ReturnType<typeof setTimeout>
+let refreshTimer: ReturnType<typeof setTimeout>
+
+async function fetchNodes() {
+  try {
+    const data = await $fetch<{ ip: string; port: string; region: string; speed: number; full: string }[]>('/api/nodes')
+    nodes.value = data.map(n => ({ ...n, status: 'unknown' as const, latency: 0 }))
+  } catch {
+    nodes.value = []
+  }
+}
+
+const maxSpeed = computed(() => {
+  if (nodes.value.length === 0) return 0
+  return Math.max(...nodes.value.map(n => n.speed))
+})
+
+const filteredNodes = computed(() => {
+  const q = search.value.toLowerCase()
+  let list = nodes.value
+  if (q) {
+    list = list.filter(n => n.ip.includes(q) || n.region.toLowerCase().includes(q) || n.full.includes(q))
+  }
+  const order: Record<string, number> = { alive: 0, unknown: 1, checking: 2, dead: 3 }
+  return [...list].sort((a, b) => order[a.status] - order[b.status])
+})
+
+const aliveCount = computed(() => nodes.value.filter(n => n.status === 'alive').length)
+const deadCount = computed(() => nodes.value.filter(n => n.status === 'dead').length)
+
+function showToast(msg: string) {
+  toast.value = msg
+  clearTimeout(toastTimer)
+  toastTimer = setTimeout(() => { toast.value = '' }, 2000)
+}
+
+async function copyIp(text: string) {
+  try {
+    await navigator.clipboard.writeText(text)
+    showToast('已成功复制')
+  } catch {
+    showToast('复制失败')
+  }
+}
+
+async function checkNode(node: NodeItem) {
+  node.status = 'checking'
+  node.latency = 0
+  try {
+    const data = await $fetch<{ alive: boolean; latency: number }>('/api/check', { params: { ip: node.ip, port: node.port } })
+    node.status = data.alive ? 'alive' : 'dead'
+    node.latency = data.latency
+  } catch {
+    node.status = 'dead'
+    node.latency = 0
+  }
+}
+
+async function checkAll() {
+  if (checking.value) return
+  checking.value = true
+  nodes.value.forEach(n => { n.status = 'unknown'; n.latency = 0 })
+  await nextTick()
+  const concurrency = 5
+  let i = 0
+  async function next() {
+    while (i < nodes.value.length) {
+      const idx = i++
+      await checkNode(nodes.value[idx])
+    }
+  }
+  await Promise.all(Array.from({ length: concurrency }, next))
+  checking.value = false
+  lastCheckTime.value = Date.now()
+}
+
+const statusText = computed(() => {
+  const alive = aliveCount.value
+  const dead = deadCount.value
+  if (alive + dead === 0) return '未知'
+  return `在线: ${alive} / 离线: ${dead}`
+})
+
+const statusColor = computed(() => {
+  if (aliveCount.value > 0) return 'text-green-700'
+  if (deadCount.value > 0) return 'text-red-600'
+  return 'text-gray-500'
+})
+
+const timeAgo = computed(() => {
+  if (!lastCheckTime.value) return ''
+  const seconds = Math.floor((Date.now() - lastCheckTime.value) / 1000)
+  if (seconds < 60) return `${seconds} 秒前检测`
+  return `${Math.floor(seconds / 60)} 分钟前检测`
+})
+
+function getBadgeColor(region: string) {
+  const colors: Record<string, string> = {
+    JP: 'bg-orange-500',
+    HK: 'bg-blue-600'
+  }
+  return colors[region] || 'bg-gray-500'
+}
+
+onMounted(async () => {
+  await fetchNodes()
+  showLoading.value = false
+  checkAll()
+  refreshTimer = setInterval(() => { checkAll() }, 300000)
+})
+</script>
+
+<template>
+  <div class="min-h-screen bg-white text-gray-900 pb-32">
+    <!-- Navigation -->
+    <div class="font-mixed font-bold">
+      <nav class="bg-white border-b border-gray-200 py-2.5 md:py-3 px-3 fixed top-0 left-0 right-0 z-10">
+        <div class="max-w-[1200px] mx-auto flex items-center justify-between px-2 sm:px-4 md:px-4">
+          <a href="/" class="font-bold text-gray-800 no-underline text-base md:text-lg hover:text-blue-500 flex items-center min-w-0 gap-1">
+            <svg class="w-6 h-6 text-blue-500" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-1 17.93c-3.95-.49-7-3.85-7-7.93 0-.62.08-1.21.21-1.79L9 15v1c0 1.1.9 2 2 2v1.93zm6.9-2.54c-.26-.81-1-1.39-1.9-1.39h-1v-3c0-.55-.45-1-1-1H8v-2h2c.55 0 1-.45 1-1V7h2c1.1 0 2-.9 2-2v-.41c2.93 1.19 5 4.06 5 7.41 0 2.08-.8 3.97-2.1 5.39z"/></svg>
+            <span class="truncate">小钱优选服务</span>
+          </a>
+          <div class="hidden md:flex flex-1 items-center justify-center gap-1">
+            <a href="/" class="text-blue-600 no-underline !py-1.5 !px-3 rounded-md font-medium bg-blue-50">首页</a>
+          </div>
+          <div class="flex items-center gap-2">
+            <button class="md:hidden inline-flex items-center justify-center w-10 h-10 rounded-md border border-gray-200 text-gray-600 hover:bg-gray-50" @click="showMobileMenu = !showMobileMenu">
+              <svg class="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16"/></svg>
+            </button>
+          </div>
+        </div>
+      </nav>
+      <div class="h-12"></div>
+    </div>
+
+    <!-- Loading Spinner -->
+    <div v-if="showLoading" class="fixed inset-0 z-[9999] w-screen h-screen flex items-center justify-center bg-white/95 backdrop-blur-sm">
+      <div class="flex flex-col items-center gap-3">
+        <svg class="animate-spin h-8 w-8 text-gray-900" viewBox="0 0 24 24">
+          <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4" fill="none"/>
+          <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z"/>
+        </svg>
+        <span class="text-sm text-gray-800">加载中…</span>
+      </div>
+    </div>
+
+    <!-- Main Content -->
+    <div class="container mx-auto px-4 py-8">
+      <div class="text-center mb-12">
+        <h1 class="text-4xl md:text-5xl font-bold text-gray-900 mb-4 font-chinese">小钱优选服务</h1>
+        <p class="text-xl text-gray-600 max-w-3xl mx-auto font-chinese">优选 IP 节点状态监测服务</p>
+        <div class="mt-8 mx-auto max-w-2xl">
+          <div class="bg-gradient-to-r from-green-50 to-blue-50 border border-green-200 rounded-lg p-4 shadow-sm">
+            <div class="flex items-center justify-center space-x-2 text-green-700">
+              <svg class="w-5 h-5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/>
+              </svg>
+              <p class="font-mixed text-base text-center">页面加载后自动检测所有节点存活状态</p>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Stats -->
+      <div class="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
+        <div class="bg-green-50 rounded-lg p-6 text-center">
+          <div class="text-2xl font-bold text-green-600 font-mixed">{{ nodes.length }}</div>
+          <div class="text-sm text-green-700">优选 IP 总数</div>
+        </div>
+        <div class="bg-blue-50 rounded-lg p-6 text-center">
+          <div class="text-2xl font-bold text-blue-600 font-mixed">{{ maxSpeed.toFixed(0) }}</div>
+          <div class="text-sm text-blue-700">最高带宽 Mbps</div>
+        </div>
+        
+        <div class="bg-yellow-50 rounded-lg p-6 text-center">
+          <div class="text-2xl font-bold text-yellow-600 font-mixed">{{ checking ? '检测中...' : '已检测' }}</div>
+          <div class="text-sm text-yellow-700">节点存活检测</div>
+          <div v-if="timeAgo" class="text-xs text-yellow-600 mt-1">{{ timeAgo }}</div>
+        </div>
+      </div>
+
+      <!-- Status + Search -->
+      <div class="flex flex-col sm:flex-row items-center justify-between mb-6 gap-4">
+        <div class="flex items-center gap-2 px-4 py-2 bg-gray-50 rounded-lg">
+          <div class="w-2 h-2 rounded-full" :class="aliveCount > 0 ? 'bg-green-500' : 'bg-gray-300'"></div>
+          <span class="text-sm font-medium" :class="statusColor">{{ statusText }}</span>
+          <span v-if="timeAgo" class="text-xs text-gray-400 ml-1">({{ timeAgo }})</span>
+        </div>
+        <div class="w-full sm:w-72">
+          <input
+            v-model="search"
+            type="text"
+            placeholder="筛选 IP / 地区..."
+            class="w-full px-4 py-2 border border-gray-200 rounded-lg text-sm text-gray-700 focus:outline-none focus:ring-2 focus:ring-blue-100 focus:border-blue-300"
+          />
+        </div>
+      </div>
+
+      <!-- Card Grid -->
+      <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+        <div v-for="node in filteredNodes" :key="node.full">
+          <div class="bg-white rounded-lg shadow-md hover:shadow-lg transition-shadow duration-300 p-4 sm:p-6 border border-gray-200">
+            <!-- Card Header -->
+            <div class="flex items-start sm:items-center justify-between mb-4 gap-3">
+              <div class="flex items-center space-x-3">
+                <div class="flex-shrink-0">
+                  <div class="w-10 h-10 rounded-full flex items-center justify-center text-white text-sm font-bold" :class="getBadgeColor(node.region)">
+                    {{ node.region }}
+                  </div>
+                </div>
+                <div>
+                  <h3 class="text-base sm:text-lg font-semibold text-gray-900 font-mixed break-all">{{ node.ip }}</h3>
+                  <p class="text-sm text-gray-500">端口: {{ node.port }}</p>
+                </div>
+              </div>
+              <div class="flex items-center space-x-1">
+                <div class="w-2 h-2 rounded-full" :class="node.status === 'alive' ? 'bg-green-500' : node.status === 'dead' ? 'bg-red-500' : node.status === 'checking' ? 'bg-yellow-500 animate-pulse' : 'bg-gray-300'"></div>
+                <span class="text-xs font-medium" :class="node.status === 'alive' ? 'text-green-700' : node.status === 'dead' ? 'text-red-600' : node.status === 'checking' ? 'text-yellow-600' : 'text-gray-400'">
+                  {{ node.status === 'alive' ? '在线' : node.status === 'dead' ? '离线' : node.status === 'checking' ? '检测' : '未知' }}
+                </span>
+              </div>
+            </div>
+
+            <!-- IP Address Box -->
+            <div class="mb-4">
+              <h4 class="text-sm font-medium text-gray-700 mb-2">优选 IP 地址:</h4>
+              <div class="relative group">
+                <div class="flex items-center justify-between bg-white border border-gray-200 shadow-sm rounded-lg px-3 py-2.5 transition-all duration-200 hover:shadow-md hover:border-blue-200">
+                  <div class="flex-1 min-w-0 mr-3">
+                    <div class="text-sm font-mono text-gray-800 font-mixed whitespace-nowrap overflow-hidden" style="mask-image:linear-gradient(to right, black 85%, transparent 100%);-webkit-mask-image:linear-gradient(to right, black 85%, transparent 100%);">{{ node.full }}</div>
+                  </div>
+                  <div class="flex items-center space-x-2 flex-shrink-0">
+                    <button
+                      class="flex items-center px-2 py-2 text-xs font-medium rounded text-blue-600 bg-blue-50 hover:bg-blue-100 hover:text-blue-700 transition-colors"
+                      @click.stop="copyIp(node.full)"
+                    >
+                      <svg class="h-3.5 w-3.5 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 5H6a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2v-1M8 5a2 2 0 002 2h2a2 2 0 002-2M8 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4"/>
+                      </svg>
+                      复制
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <!-- Tags -->
+            <div class="flex flex-wrap gap-2">
+              <span class="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-blue-100 text-blue-800">{{ node.region }}</span>
+              <span class="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-green-100 text-green-800">{{ node.speed.toFixed(0) }} Mbps</span>
+              <span v-if="node.status === 'alive' && node.latency > 0" class="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-purple-100 text-purple-800">{{ node.latency }} ms</span>
+              <span class="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium" :class="node.status === 'alive' ? 'bg-green-100 text-green-800' : node.status === 'dead' ? 'bg-red-100 text-red-800' : 'bg-gray-100 text-gray-800'">
+                {{ node.status === 'alive' ? '在线' : node.status === 'dead' ? '离线' : node.status === 'checking' ? '检测中' : '未知' }}
+              </span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Footer -->
+    <footer class="bg-gray-50 text-gray-950 border-t border-gray-200 py-3 md:py-4 fixed bottom-0 left-0 right-0 z-10 bg-opacity-90 backdrop-blur-sm">
+      <div class="container mx-auto px-4 sm:px-6 lg:px-8">
+        <div class="flex flex-col items-center justify-between gap-4 md:flex-row">
+          <span class="text-sm md:text-base">Copyright &copy; 2026 小钱优选服务</span>
+          <nav>
+            <span class="flex items-center gap-2 leading-tight">
+              Powered By
+              <a href="https://nuxt.com" class="text-blue-600">
+                <svg width="80" height="20" viewBox="0 0 800 200" fill="none" xmlns="http://www.w3.org/2000/svg">
+                  <path d="M377 200C379.16 200 381 198.209 381 196V103C381 103 386 112 395 127L434 194C435.785 197.74 439.744 200 443 200H470V50H443C441.202 50 439 51.4941 439 54V148L421 116L385 55C383.248 51.8912 379.479 50 376 50H350V200H377Z" fill="currentColor"/>
+                  <path d="M726 92H739C742.314 92 745 89.3137 745 86V60H773V92H800V116H773V159C773 169.5 778.057 174 787 174H800V200H783C759.948 200 745 185.071 745 160V116H726V92Z" fill="currentColor"/>
+                  <path d="M591 92V154C591 168.004 585.742 179.809 578 188C570.258 196.191 559.566 200 545 200C530.434 200 518.742 196.191 511 188C503.389 179.809 498 168.004 498 154V92H514C517.412 92 520.769 92.622 523 95C525.231 97.2459 526 98.5652 526 102V154C526 162.059 526.457 167.037 530 171C533.543 174.831 537.914 176 545 176C552.217 176 555.457 174.831 559 171C562.543 167.037 563 162.059 563 154V102C563 98.5652 563.769 96.378 566 94C567.96 91.9107 570.028 91.9599 573 92C573.411 92.0055 574.586 92 575 92H591Z" fill="currentColor"/>
+                  <path d="M676 144L710 92H684C680.723 92 677.812 93.1758 676 96L660 120L645 97C643.188 94.1758 639.277 92 636 92H611L645 143L608 200H634C637.25 200 640.182 196.787 642 194L660 167L679 195C680.818 197.787 683.75 200 687 200H713L676 144Z" fill="currentColor"/>
+                  <path d="M168 200H279C282.542 200 285.932 198.756 289 197C292.068 195.244 295.23 193.041 297 190C298.77 186.959 300.002 183.51 300 179.999C299.998 176.488 298.773 173.04 297 170.001L222 41C220.23 37.96 218.067 35.7552 215 34C211.933 32.2448 207.542 31 204 31C200.458 31 197.067 32.2448 194 34C190.933 35.7552 188.77 37.96 187 41L168 74L130 9.99764C128.228 6.95784 126.068 3.75491 123 2C119.932 0.245087 116.542 0 113 0C109.458 0 106.068 0.245087 103 2C99.9323 3.75491 96.7717 6.95784 95 9.99764L2 170.001C0.226979 173.04 0.00154312 176.488 1.90993e-06 179.999C-0.0015393 183.51 0.229648 186.959 2 190C3.77035 193.04 6.93245 195.244 10 197C13.0675 198.756 16.4578 200 20 200H90C117.737 200 137.925 187.558 152 164L186 105L204 74L259 168H186L168 200ZM89 168H40L113 42L150 105L125.491 147.725C116.144 163.01 105.488 168 89 168Z" fill="#00DC82"/>
+                </svg>
+              </a>
+            </span>
+          </nav>
+        </div>
+      </div>
+    </footer>
+
+    <!-- Toast -->
+    <Teleport to="body">
+      <div v-if="toast" class="fixed top-4 left-1/2 -translate-x-1/2 z-50">
+        <div class="px-4 py-2 bg-white border border-green-200 rounded-lg shadow-lg text-green-700 text-sm font-medium">
+          {{ toast }}
+        </div>
+      </div>
+    </Teleport>
+  </div>
+</template>
+
+<style>
+body {
+  font-family: "Cascadia Code", "xiaolai", "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", monospace, sans-serif !important;
+}
+.font-chinese {
+  font-family: "xiaolai", "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", sans-serif !important;
+}
+.font-english {
+  font-family: "Cascadia Code", "SF Mono", "Monaco", "Inconsolata", "Roboto Mono", monospace !important;
+}
+.font-mixed {
+  font-family: "Cascadia Code", "xiaolai", "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", monospace, sans-serif !important;
+}
+</style>
+

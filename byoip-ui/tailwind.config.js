@@ -1,0 +1,12 @@
+/** @type {import('tailwindcss').Config} */
+module.exports = {
+  theme: {
+    extend: {
+      fontFamily: {
+        chinese: ['xiaolai', 'PingFang SC', 'Hiragino Sans GB', 'Microsoft YaHei', 'sans-serif'],
+        english: ['Cascadia Code', 'SF Mono', 'Monaco', 'Inconsolata', 'Roboto Mono', 'monospace'],
+        mixed: ['Cascadia Code', 'xiaolai', 'PingFang SC', 'Hiragino Sans GB', 'Microsoft YaHei', 'monospace', 'sans-serif'],
+      },
+    },
+  },
+}
