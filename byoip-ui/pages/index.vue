@@ -105,13 +105,15 @@ async function copyIp(text: string) {
 async function checkNode(node: NodeItem) {
   node.status = 'checking'
   node.latency = 0
+  const protocol = ['443', '8443', '2053', '2083', '2087', '2096'].includes(node.port) ? 'https' : 'http'
+  const start = performance.now()
   try {
-    const data = await fetch(`https://api.090227.xyz/check?proxyip=${node.ip}:${node.port}`, { signal: AbortSignal.timeout(15000) }).then(r => r.json())
-    node.status = data.success ? 'alive' : 'dead'
-    node.latency = data.responseTime || 0
+    await fetch(`${protocol}://${node.ip}:${node.port}/`, { mode: 'no-cors', cache: 'no-store', signal: AbortSignal.timeout(5000) })
+    node.latency = Math.round(performance.now() - start)
+    node.status = 'alive'
   } catch {
-    node.status = 'dead'
-    node.latency = 0
+    node.latency = Math.round(performance.now() - start)
+    node.status = node.latency > 50 ? 'alive' : 'dead'
   }
 }
 
